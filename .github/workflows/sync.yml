@@ -1,0 +1,64 @@
+name: Sync hagezi dns-blocklists
+
+on:
+  schedule:
+    # 每周六 UTC 02:00
+    # 北京时间周六 10:00
+    - cron: "0 2 * * 6"
+
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    name: Sync upstream repository
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Add upstream repository
+        run: |
+          git remote add upstream https://github.com/hagezi/dns-blocklists.git
+
+      - name: Fetch upstream changes
+        run: |
+          git fetch upstream
+
+      - name: Backup sync workflow
+        run: |
+          cp .github/workflows/sync.yml /tmp/sync.yml
+
+      - name: Sync with upstream main
+        run: |
+          git checkout main
+          git reset --hard upstream/main
+
+      - name: Restore sync workflow
+        run: |
+          mkdir -p .github/workflows
+          cp /tmp/sync.yml .github/workflows/sync.yml
+
+      - name: Commit sync workflow
+        run: |
+          git add .github/workflows/sync.yml
+
+          if git diff --cached --quiet; then
+            echo "No changes to sync workflow"
+          else
+            git commit -m "chore: preserve sync workflow"
+          fi
+
+      - name: Push changes
+        run: |
+          git push origin main --force
